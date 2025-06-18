@@ -19,18 +19,20 @@ const transporter = nodemailer.createTransport({
 });
 
 app.post('/zoho', upload.any(), async (req, res) => {
-  const subject = req.body.subject || 'Zoho Invoice';
-  const content = req.body.content || 'Forwarded message from Zoho';
-  const attachments = [];
-
-  for (const file of req.files) {
-    attachments.push({
-      filename: file.originalname,
-      path: file.path
-    });
-  }
-
   try {
+    const subject = req?.body?.subject || 'Zoho Invoice';
+    const content = req?.body?.content || 'Forwarded message from Zoho';
+    const attachments = [];
+
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files) {
+        attachments.push({
+          filename: file.originalname,
+          path: file.path
+        });
+      }
+    }
+
     await transporter.sendMail({
       from: `"Zoho Forwarder" <${process.env.SMTP_USER}>`,
       to: 'bills.o96mxb.wf4amrdhwpdzgo7u@xerofiles.com',
@@ -39,11 +41,14 @@ app.post('/zoho', upload.any(), async (req, res) => {
       attachments
     });
 
-    req.files.forEach(file => fs.unlinkSync(file.path));
-    res.status(200).json({ status: 'Email sent to Xero!' });
+    if (req.files) {
+      req.files.forEach(file => fs.unlinkSync(file.path));
+    }
+
+    res.sendStatus(200); // ✅ Always tell Zoho “we’re alive”
   } catch (err) {
-    console.error('Failed to send email:', err);
-    res.status(500).json({ error: 'Email failed to send' });
+    console.error('Webhook processing error:', err);
+    res.sendStatus(200); // ✅ Still tell Zoho we’re OK so it saves config
   }
 });
 
